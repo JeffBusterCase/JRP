@@ -1,5 +1,5 @@
 # JRP
-Jruby project manager. supports desktop libgdx. compiles to jar
+Jruby Project Manager. Supports desktop libgdx and compiles to jar.
 
 ### Only Linux yet!
 
