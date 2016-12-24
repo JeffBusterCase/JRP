@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+
+function showHelp(){
+    echo 'Example : jrp [method [arg]]'
+    echo ''
+    echo 'Methods: '
+    echo '   new [project Name]        :Create New Project'
+    echo '   new -lgdx [project Name]  :Create New LibGDX project'
+    echo '  *Inside project foler*     '
+    echo '   run                       :Run Project'
+    echo '   dist,dist [output]        :compiles into a final jar[CLASS]'
+    echo '   dist:rb, dist:rb [output] :compiles into a final boostrap jar[RB]'
+    return 0
+}
+
+function getMainClass(){
+    returned=`grep 'Main-Class:' ./jrp.p | cut -d: -f2 | cut -d ' ' -f2`
+}
+function getValue(){
+    returned=`grep $1 ./jrp.p | cut -d: -f2 | cut -d ' ' -f2`
+}
+function getClassPath(){
+    returned=`ls ./libs/*.jar | sed -z 's/\n/:/g' \
+        | sed 's/:$//'`
+}
+
+if [ $1 ];then
+    case $1 in
+    'new')
+        # Create structure Folder and files
+        if [ $2 ];then
+            isLibGDX="no"
+            if [ $2 == "-lgdx" ];then
+                if [ $3 ];then
+                    projectName=$3
+                    isLibGDX="yes"
+                else
+                    echo "Project Name not specified!"
+                    exit
+                fi
+                
+            else
+                #Assume that the second argument is the project name
+                projectName=$2
+            fi
+            
+            # Create Project
+            mkdir $projectName
+            cd ./$projectName
+            mkdir src libs
+            touch ./src/$projectName.rb
+            echo "Downloading jruby library"
+            wget -nv --show-progress -O ./libs/jruby.jar https://s3.amazonaws.com/jruby.org/downloads/1.7.26/jruby-complete-1.7.26.jar
+            echo "Main-Class: $projectName" > ./jrp.p
+            
+            if [ $isLibGDX == "yes" ];then
+                # Create Libgdx Structure
+                mkdir assets
+                hoster="https://libgdx.badlogicgames.com/nightlies/dist"
+                
+                # Download libgdx dependencies for desktop dev
+                echo "Downloading LibGDX dependencies"
+                wget -nv --show-progress -P libs $hoster/gdx.jar
+                wget -nv --show-progress -P libs $hoster/gdx-natives.jar
+                wget -nv --show-progress -P libs $hoster/gdx-backend-lwjgl.jar
+                wget -nv --show-progress -P libs $hoster/gdx-backend-lwjgl-natives.jar
+                
+                wget -nv --show-progress -O ./assets/badlogic.jpg http://i.imgur.com/joJOP1R.jpg
+                
+                
+                
+                cat <<EOF > ./src/$projectName.rb
+java_import com.badlogic.gdx.ApplicationAdapter
+java_import com.badlogic.gdx.Gdx
+java_import com.badlogic.gdx.graphics.GL20
+java_import com.badlogic.gdx.graphics.Texture
+java_import com.badlogic.gdx.graphics.g2d.SpriteBatch
+
+class $projectName < ApplicationAdapter
+    def create
+        @batch = SpriteBatch.new();
+        @img = Texture.new("assets/badlogic.jpg")
+    end
+  
+    def render
+        Gdx.gl.glClearColor(1, 0, 0, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+        @batch.begin()
+        @batch.draw(@img, 0, 0)
+        @batch.end()
+    end
+  
+    def dispose
+        @batch.dispose()
+    end
+end
+                
+EOF
+                
+                cat <<EOF > ./src/desktopLauncher.rb
+Dir["libs/\*.jar"].each { |jar| require jar }
+java_import com.badlogic.gdx.backends.lwjgl.LwjglApplication
+java_import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration
+
+require "./src/$projectName"
+
+config = LwjglApplicationConfiguration.new()
+LwjglApplication.new($projectName.new(), config)
+
+EOF
+                
+                echo "Main-Class: desktopLauncher" > ./jrp.p
+                
+            fi
+            
+            cd ..
+            echo Project setup finished successfully.
+        else 
+            echo "Project Name not specified!"
+            exit
+        fi
+        ;;
+    'run')
+        # Run as ruby file
+        getMainClass;main_class=$returned
+        getClassPath;jruby -J-cp $returned ./src/$main_class.rb
+        
+        ;;
+    'dist')
+        # Distribute as final jar
+        if [ ! -f ./src/*.rb ];then echo BUILD FAILED;echo FILE NOT FOUND;exit;fi
+        [ -d ./build ] || mkdir build
+        [ -d ./build/classes ] || mkdir ./build/classes
+        
+        mv -f ./src ./com
+        getClassPath
+        jrubyc -t './build/classes/' -J-Djruby.jit.enabled=true -c $returned `ls -1 ./com/*.rb | tr '\n' ' '`
+        mv -f ./com ./src
+        
+        [ -d ./META-INF ] || mkdir ./META-INF
+        echo 'Manifest-Version: 1.0' > ./META-INF/MANIFEST.MF
+        
+        getClassPath;classpath=`echo $returned |  sed 's/:/ /g' | sed 's/\.\///g'`
+        echo "Class-Path: $classpath" >> ./META-INF/MANIFEST.MF
+        
+        getMainClass;main_class=$returned
+        echo "Main-Class: com.$main_class" >> ./META-INF/MANIFEST.MF
+        
+        # Get Output File name
+        if [ $2 ];then
+            output=$2
+        else 
+            output=$main_class
+        fi
+        
+        jar cMf $output.jar ./libs ./META-INF
+        cd ./build/classes/com
+        
+        file-roller --add-to=../../../$output.jar ./*.class
+        
+        cd ../../../
+        rm -r ./META-INF
+        echo ""
+        echo BUILD SUCCESSFUL
+        exit
+        ;;
+    '--help')
+        # Show Help
+        showHelp
+        exit
+        ;;
+    'dist:rb')
+        [ -d ./META-INF ] || mkdir ./META-INF
+        echo 'Manifest-Version: 1.0' > ./META-INF/MANIFEST.MF
+        
+        getClassPath;classpath=`echo $returned |  sed 's/:/ /g' | sed 's/\.\///g'`
+        echo "Class-Path: $classpath" >> ./META-INF/MANIFEST.MF
+        
+        getMainClass;main_class=$returned
+        cp ./src/*.rb ./
+        mv ./$returned.rb ./jar-bootstrap.rb
+        
+        echo "Main-Class: org.jruby.JarBootstrapMain" >> ./META-INF/MANIFEST.MF
+        
+        # Get Output File name
+        if [ $2 ];then
+            output=$2
+        else 
+            output=$main_class
+        fi
+        
+        jar cMf $output.jar ./libs ./META-INF ./*.rb
+        
+        rm ./*.rb
+      
+        rm -r ./META-INF
+        echo ""
+        echo BUILD SUCCESSFUL
+        exit
+        ;;
+    *)
+        # Else
+        echo Unreconized Option \'$1\'
+        showHelp
+        exit
+        ;;
+    esac
+else 
+    echo 'No Option Specified'
+    showHelp
+    exit
+fi
