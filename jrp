@@ -76,10 +76,14 @@ java_import com.badlogic.gdx.graphics.GL20
 java_import com.badlogic.gdx.graphics.Texture
 java_import com.badlogic.gdx.graphics.g2d.SpriteBatch
 
+# This is an auto generated file.
+#
+# * DO NOT ADD 'REQUIRE' calls. All ruby files will be one.
+
 class $projectName < ApplicationAdapter
     def create
         @batch = SpriteBatch.new();
-        @img = Texture.new("assets/badlogic.jpg")
+        @img = Texture.new("badlogic.jpg")
     end
   
     def render
@@ -98,19 +102,17 @@ end
 EOF
                 
                 cat <<EOF > ./src/desktopLauncher.rb
-Dir["libs/\*.jar"].each { |jar| require jar }
 java_import com.badlogic.gdx.backends.lwjgl.LwjglApplication
 java_import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration
 
-require "./src/$projectName"
-
 config = LwjglApplicationConfiguration.new()
 LwjglApplication.new($projectName.new(), config)
-
 EOF
                 
                 echo "Main-Class: desktopLauncher" > ./jrp.p
-                
+                echo "Project-Type: LibGDX" >> ./jrp.p
+            else
+                echo "Project-Type: project" >> ./jrp.p
             fi
             
             cd ..
@@ -122,9 +124,20 @@ EOF
         ;;
     'run')
         # Run as ruby file
-        getMainClass;main_class=$returned
-        getClassPath;jruby -J-cp $returned ./src/$main_class.rb
         
+        getMainClass;main_class=$returned
+        
+        for i in `ls -1 ./src/*.rb`;do
+            if [ $i != ./src/$main_class.rb ];then
+                cat $i >> ./running.rb
+            fi
+        done
+        # Finally add the last and most important
+        cat ./src/$main_class.rb >> ./running.rb
+        
+        getClassPath;jruby -J-cp $returned ./running.rb
+        rm running.rb
+        exit
         ;;
     'dist')
         # Distribute as final jar
@@ -132,19 +145,8 @@ EOF
         [ -d ./build ] || mkdir build
         [ -d ./build/classes ] || mkdir ./build/classes
         
-        mv -f ./src ./com
-        getClassPath
-        jrubyc -t './build/classes/' -J-Djruby.jit.enabled=true -c $returned `ls -1 ./com/*.rb | tr '\n' ' '`
-        mv -f ./com ./src
-        
-        [ -d ./META-INF ] || mkdir ./META-INF
-        echo 'Manifest-Version: 1.0' > ./META-INF/MANIFEST.MF
-        
-        getClassPath;classpath=`echo $returned |  sed 's/:/ /g' | sed 's/\.\///g'`
-        echo "Class-Path: $classpath" >> ./META-INF/MANIFEST.MF
-        
+        [ -d com ] || mkdir com
         getMainClass;main_class=$returned
-        echo "Main-Class: com.$main_class" >> ./META-INF/MANIFEST.MF
         
         # Get Output File name
         if [ $2 ];then
@@ -152,14 +154,53 @@ EOF
         else 
             output=$main_class
         fi
+        [ ! -f $output.jar ] || rm $output.jar
+        for i in `ls -1 ./src/*.rb`;do
+            if [ $i != ./src/$main_class.rb ];then
+                cat $i >> ./com/$main_class.rb
+            fi
+        done
+        # Finally add the last and most important
+        cat ./src/$main_class.rb >> ./com/$main_class.rb
         
-        jar cMf $output.jar ./libs ./META-INF
+        getClassPath
+        jrubyc -t './build/classes/' -J-Djruby.jit.enabled=true -c $returned ./com/$main_class.rb 
+        
+        [ -d ./META-INF ] || mkdir ./META-INF
+        echo 'Manifest-Version: 1.0' > ./META-INF/MANIFEST.MF
+        
+        echo "Main-Class: com.$main_class" >> ./META-INF/MANIFEST.MF
+        
+        # Extract libs into tmp folder
+        mkdir ./libs/.tmp
+        cd ./libs/.tmp
+        
+        echo "Extracting libraries"
+        
+        for i in `ls -1 ../*.jar | tr '\n' ' '`;do
+            jar xf $i
+        done
+        
+        echo "Adding libraries to final jar"
+       
+        file-roller --add-to=../../$output.jar ./*
+        
+        cd ../../
+        rm -r ./libs/.tmp
+        
+        file-roller --add-to=$output.jar ./META-INF
+        getValue "Project-Type";projType=$returned
+        if [ $returned == "LibGDX" ];then 
+            file-roller --add-to=$output.jar ./assets/*
+        fi
+        
         cd ./build/classes/com
         
-        file-roller --add-to=../../../$output.jar ./*.class
+        file-roller --add-to=../../../$output.jar ./$main_class.class
         
         cd ../../../
         rm -r ./META-INF
+        rm -r com
         echo ""
         echo BUILD SUCCESSFUL
         exit
@@ -170,17 +211,9 @@ EOF
         exit
         ;;
     'dist:rb')
-        [ -d ./META-INF ] || mkdir ./META-INF
-        echo 'Manifest-Version: 1.0' > ./META-INF/MANIFEST.MF
-        
-        getClassPath;classpath=`echo $returned |  sed 's/:/ /g' | sed 's/\.\///g'`
-        echo "Class-Path: $classpath" >> ./META-INF/MANIFEST.MF
+        # Distribute with ruby as bootstrap file
         
         getMainClass;main_class=$returned
-        cp ./src/*.rb ./
-        mv ./$returned.rb ./jar-bootstrap.rb
-        
-        echo "Main-Class: org.jruby.JarBootstrapMain" >> ./META-INF/MANIFEST.MF
         
         # Get Output File name
         if [ $2 ];then
@@ -189,11 +222,47 @@ EOF
             output=$main_class
         fi
         
-        jar cMf $output.jar ./libs ./META-INF ./*.rb
+        [ ! -f $output.jar ] || rm $output.jar
         
-        rm ./*.rb
-      
-        rm -r ./META-INF
+        cp ./libs/jruby.jar ./$output.jar
+        
+        
+        # Extract libs into tmp folder
+        mkdir ./libs/.tmp
+        cd ./libs/.tmp
+        
+        echo "Extracting libraries"
+        
+        for i in `ls -1 ../*.jar | tr '\n' ' '`;do
+            if [ $i != ../jruby.jar ];then
+                jar xf $i
+            fi
+        done
+        
+        echo "Adding libraries to final jar"
+       
+        file-roller --add-to=../../$output.jar ./*
+        
+        cd ../../
+        rm -r ./libs/.tmp
+        
+        for i in `ls -1 ./src/*.rb`;do
+            if [ $i != ./src/$main_class.rb ];then
+                cat $i >> ./jar-bootstrap.rb
+            fi
+        done
+        # Finally add the last and most important
+        cat ./src/$main_class.rb >> ./jar-bootstrap.rb
+        
+        getValue "Project-Type";projType=$returned
+        if [ $returned == "LibGDX" ];then 
+            file-roller --add-to=$output.jar ./assets/*
+        fi
+        
+        jar ufe $output.jar org.jruby.JarBootstrapMain jar-bootstrap.rb
+        
+        rm jar-bootstrap.rb
+        
         echo ""
         echo BUILD SUCCESSFUL
         exit
