@@ -1,23 +1,26 @@
 # JRP
 Jruby Project Manager. Supports desktop libgdx and compiles to jar.
 
-### Currently in really deep dev. (yet just run with one file)
+### Currently in really deep dev. (multiple folders not implemented yet. but easy.)
 ### Only Linux yet!
 
 
-##### The command `jrp dist` requires
+##### Needs
  * `file-roller` installed (already installed on ubuntu)
  * jruby compiler `jrubyc` (comes with jruby).
 
 ##### Create a new Project
 `  jrp new HelloWorld`
 
+##### Create a new LibGDX desktop project 
+`  jrp new -lgdx HelloWorld`
+
+#### Inside project folder
 ##### Run project 
-inside project folder
 `  jrp run`
 
-##### Generate final jar
+##### Generate the final jar with ruby files as bootstrap.
 `  jrp dist:rb`
 
-##### Compile to jruby files to .class, Generate final jar
+##### Generate the final jar with ruby files as a class file.
 `  jrp dist`
