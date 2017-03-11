@@ -5,7 +5,7 @@ version="11-03-2017_0.1.1"
 function showHelp(){
     echo 'Example : jrp [method [arg]]'
     echo ''
-    echo '   -v, --version to see the version' 
+    echo '   -v, --version to see the version'
     echo ''
     echo 'Methods: '
     echo '   new [project Name]        :Create New Project'
@@ -30,7 +30,7 @@ function getValue(){
 }
 function getClassPath(){
     returned=""
-    if [ -f ./jrp.p ];then
+    if [ -d libs ];then
         returned=`ls ./libs/*.jar | sed -z 's/\n/:/g' \
             | sed 's/:$//'`
     else
@@ -60,12 +60,12 @@ if [ $1 ];then
                     echo "Project Name not specified!"
                     exit
                 fi
-                
+
             else
                 #Assume that the second argument is the project name
                 projectName=$2
             fi
-            
+
             # Create Project
             mkdir $projectName
             cd ./$projectName
@@ -74,23 +74,23 @@ if [ $1 ];then
             echo "Downloading jruby library"
             wget -nv --show-progress -O ./libs/jruby.jar https://s3.amazonaws.com/jruby.org/downloads/1.7.26/jruby-complete-1.7.26.jar
             echo "Main-Class: $projectName" > ./jrp.p
-            
+
             if [ $isLibGDX == "yes" ];then
                 # Create Libgdx Structure
                 mkdir assets
                 hoster="https://libgdx.badlogicgames.com/nightlies/dist"
-                
+
                 # Download libgdx dependencies for desktop dev
                 echo "Downloading LibGDX dependencies"
                 wget -nv --show-progress -P libs $hoster/gdx.jar
                 wget -nv --show-progress -P libs $hoster/gdx-natives.jar
                 wget -nv --show-progress -P libs $hoster/gdx-backend-lwjgl.jar
                 wget -nv --show-progress -P libs $hoster/gdx-backend-lwjgl-natives.jar
-                
+
                 wget -nv --show-progress -O ./assets/badlogic.jpg http://i.imgur.com/joJOP1R.jpg
-                
-                
-                
+
+
+
                 cat <<EOF > ./src/$projectName.rb
 java_import com.badlogic.gdx.ApplicationAdapter
 java_import com.badlogic.gdx.Gdx
@@ -107,7 +107,7 @@ class $projectName < ApplicationAdapter
         @batch = SpriteBatch.new()
         @img = Texture.new("badlogic.jpg")
     end
-  
+
     def render
         Gdx.gl.glClearColor(1, 0, 0, 1)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
@@ -115,14 +115,14 @@ class $projectName < ApplicationAdapter
         @batch.draw(@img, 0, 0)
         @batch.end()
     end
-  
+
     def dispose
         @batch.dispose()
     end
 end
-                
+
 EOF
-                
+
                 cat <<EOF > ./src/desktopLauncher.rb
 java_import com.badlogic.gdx.backends.lwjgl.LwjglApplication
 java_import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration
@@ -130,16 +130,16 @@ java_import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration
 config = LwjglApplicationConfiguration.new()
 LwjglApplication.new($projectName.new(), config)
 EOF
-                
+
                 echo "Main-Class: desktopLauncher" > ./jrp.p
                 echo "Project-Type: LibGDX" >> ./jrp.p
             else
                 echo "Project-Type: project" >> ./jrp.p
             fi
-            
+
             cd ..
             echo Project setup finished successfully.
-        else 
+        else
             echo "Project Name not specified!"
             exit
         fi
@@ -147,70 +147,70 @@ EOF
     'run')
         # Run as ruby file
         check_if_is_jrp
-        
+
         current=`pwd`
-        
-        folder_name="./.run"
+
+        folder_name='./.run'
         if [ $2 ];then
 	        if [ $2 == "-w" ];then
 		        if  [ $3 ];then
-                    folder_name=$3
+                folder_name=$3
 		        fi
 	        fi
-	    fi
-	
-	    getMainClass;main_class=$returned
-            
-	    mkdir ./.run
-	
-	    runner_file=`openssl rand -hex 12`
-	    runner_file=$runner_file.rb
-	    
-	    way="$folder_name/$runner_file"
-	    
+	      fi
+
+  	    getMainClass;main_class=$returned
+
+  	    [ ! $folder_name == './.run' ] || mkdir ./.run
+
+  	    runner_file=`openssl rand -hex 12`
+  	    runner_file=$runner_file.rb
+
+  	    way="$folder_name/$runner_file"
+
         for i in `ls -1 ./src/*.rb`;do
             if [ $i != ./src/$main_class.rb ];then
                 cat $i >> $way
             fi
         done
-        
+
         # Finally add the last and most important
         cat ./src/$main_class.rb >> $way
-        
+
+
+
         cd $folder_name
-        class_path=""
-	    
-	    # Only supports .. yet, not ../../../
-	    # Because would need to compute the number of each '/' in the new path
-	    # passed to '-w' option
-	    
-	    getClassPath;jruby -J-cp $returned $runner_file
-        
+
+  	    # Only supports .. yet, not ../../../
+  	    # Because would need to compute the number of each '/' in the new path
+  	    # passed to '-w' option
+
+  	    getClassPath;jruby -J-cp $returned $runner_file
+
         rm $runner_file
-        
+
         # project path
         cd $current
-        
-        if [ -d .run ];then 
-            rm -r ./.run 
-        fi
+
+        [ ! -d .run ] || rm -r .run
+
         exit
         ;;
     'dist')
         # Distribute as final jar
         check_if_is_jrp
-        
+
         if [ ! -f ./src/*.rb ];then echo BUILD FAILED;echo FILE NOT FOUND;exit;fi
         [ -d ./build ] || mkdir build
         [ -d ./build/classes ] || mkdir ./build/classes
-        
+
         [ -d com ] || mkdir com
         getMainClass;main_class=$returned
-        
+
         # Get Output File name
         if [ $2 ];then
             output=$2
-        else 
+        else
             output=$main_class
         fi
         [ ! -f $output.jar ] || rm $output.jar
@@ -221,42 +221,42 @@ EOF
         done
         # Finally add the last and most important
         cat ./src/$main_class.rb >> ./com/$main_class.rb
-        
+
         getClassPath
-        jrubyc -t './build/classes/' -J-Djruby.jit.enabled=true -c $returned ./com/$main_class.rb 
-        
+        jrubyc -t './build/classes/' -J-Djruby.jit.enabled=true -c $returned ./com/$main_class.rb
+
         [ -d ./META-INF ] || mkdir ./META-INF
         echo 'Manifest-Version: 1.0' > ./META-INF/MANIFEST.MF
-        
+
         echo "Main-Class: com.$main_class" >> ./META-INF/MANIFEST.MF
-        
+
         # Extract libs into tmp folder
         mkdir ./libs/.tmp
         cd ./libs/.tmp
-        
+
         echo "Extracting libraries"
-        
+
         for i in `ls -1 ../*.jar | tr '\n' ' '`;do
             jar xf $i
         done
-        
+
         echo "Adding libraries to final jar"
-       
+
         file-roller --add-to=../../$output.jar ./*
-        
+
         cd ../../
         rm -r ./libs/.tmp
-        
+
         file-roller --add-to=$output.jar ./META-INF
         getValue "Project-Type";projType=$returned
-        if [ $returned == "LibGDX" ];then 
+        if [ $returned == "LibGDX" ];then
             file-roller --add-to=$output.jar ./assets/*
         fi
-        
+
         cd ./build/classes/com
-        
+
         file-roller --add-to=../../../$output.jar ./$main_class.class
-        
+
         cd ../../../
         rm -r ./META-INF
         rm -r com
@@ -273,38 +273,38 @@ EOF
         # Distribute with ruby as bootstrap file
         check_if_is_jrp
         getMainClass;main_class=$returned
-        
+
         # Get Output File name
         if [ $2 ];then
             output=$2
-        else 
+        else
             output=$main_class
         fi
-        
+
         [ ! -f $output.jar ] || rm $output.jar
-        
+
         cp ./libs/jruby.jar ./$output.jar
-        
-        
+
+
         # Extract libs into tmp folder
         mkdir ./libs/.tmp
         cd ./libs/.tmp
-        
+
         echo "Extracting libraries"
-        
+
         for i in `ls -1 ../*.jar | tr '\n' ' '`;do
             if [ $i != ../jruby.jar ];then
                 jar xf $i
             fi
         done
-        
+
         echo "Adding libraries to final jar"
-       
+
         file-roller --add-to=../../$output.jar ./*
-        
+
         cd ../../
         rm -r ./libs/.tmp
-        
+
         for i in `ls -1 ./src/*.rb`;do
             if [ $i != ./src/$main_class.rb ];then
                 cat $i >> ./jar-bootstrap.rb
@@ -312,16 +312,16 @@ EOF
         done
         # Finally add the last and most important
         cat ./src/$main_class.rb >> ./jar-bootstrap.rb
-        
+
         getValue "Project-Type";projType=$returned
-        if [ $returned == "LibGDX" ];then 
+        if [ $returned == "LibGDX" ];then
             file-roller --add-to=$output.jar ./assets/*
         fi
-        
+
         jar ufe $output.jar org.jruby.JarBootstrapMain jar-bootstrap.rb
-        
+
         rm jar-bootstrap.rb
-        
+
         echo ""
         echo BUILD SUCCESSFUL
         exit
@@ -333,7 +333,7 @@ EOF
         exit
         ;;
     esac
-else 
+else
     echo 'No Option Specified'
     showHelp
     exit
