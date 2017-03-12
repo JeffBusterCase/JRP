@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="11-03-2017_0.1.12"
+version="11-03-2017_0.1.2"
 
 function showHelp(){
     echo 'Example : jrp [method [arg]]'
@@ -199,8 +199,11 @@ EOF
     'dist')
         # Distribute as final jar
         check_if_is_jrp
-
-        if [ ! -f ./src/*.rb ];then echo BUILD FAILED;echo FILE NOT FOUND;exit;fi
+	getMainClass
+        if [ ! -f ./src/$returned.rb ];then 
+            echo BUILD FAILED - FILE NOT FOUND 
+            exit
+        fi
         [ -d ./build ] || mkdir build
         [ -d ./build/classes ] || mkdir ./build/classes
 
@@ -214,8 +217,12 @@ EOF
             output=$main_class
         fi
         [ ! -f $output.jar ] || rm $output.jar
+
+        # before every thing
+        [ ! -f ./src/imports.rb ] || cat ./src/imports.rb >> ./com/$main_class.rb
+
         for i in `ls -1 ./src/*.rb`;do
-            if [ $i != ./src/$main_class.rb ];then
+            if [[ ( $i != ./src/$main_class.rb && $i != ./src/imports.rb ) ]];then
                 cat $i >> ./com/$main_class.rb
             fi
         done
@@ -305,11 +312,15 @@ EOF
         cd ../../
         rm -r ./libs/.tmp
 
+        # before every thing
+        [ ! -f ./src/imports.rb ] || cat ./src/imports.rb >> ./jar-bootstrap.rb
+
         for i in `ls -1 ./src/*.rb`;do
-            if [ $i != ./src/$main_class.rb ];then
+            if [[ ( $i != ./src/$main_class.rb && $i != ./src/imports.rb ) ]];then
                 cat $i >> ./jar-bootstrap.rb
             fi
         done
+
         # Finally add the last and most important
         cat ./src/$main_class.rb >> ./jar-bootstrap.rb
 
