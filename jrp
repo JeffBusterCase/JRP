@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="11-03-2017_0.1.1"
+version="11-03-2017_0.1.12"
 
 function showHelp(){
     echo 'Example : jrp [method [arg]]'
@@ -167,9 +167,9 @@ EOF
   	    runner_file=$runner_file.rb
 
   	    way="$folder_name/$runner_file"
-
+        [ ! -f ./src/imports.rb ] || cat ./src/imports.rb >> $way
         for i in `ls -1 ./src/*.rb`;do
-            if [ $i != ./src/$main_class.rb ];then
+	    if [[ ( $i != ./src/$main_class.rb && $i != ./src/imports.rb ) ]];then
                 cat $i >> $way
             fi
         done
