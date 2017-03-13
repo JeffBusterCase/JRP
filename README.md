@@ -1,7 +1,7 @@
 # JRP 0.1.1
 Jruby Project Manager. Supports desktop libgdx and compiles to jar.
 
-### Currently in really deep dev. (multiple folders not implemented yet. but easy.)
+#### NOTE: multiple folders not implemented yet(`/src/way1/*.rb`, just `/src/*.rb`). but easy.
 ### Only Linux yet!
 
 
