@@ -1,4 +1,4 @@
-# JRP 0.1.1
+# JRP 0.1.3
 Jruby Project Manager. Supports desktop libgdx and compiles to jar.
 
 #### NOTE: multiple folders not implemented yet(`/src/way1/*.rb`, just `/src/*.rb`). but easy.
@@ -21,6 +21,8 @@ Jruby Project Manager. Supports desktop libgdx and compiles to jar.
 ##### with the assets
 `  jrp run -w assets`
 
+##### leave runned file
+`  jrp run -w assets -l`
 
 ##### Generate the final jar with ruby files as bootstrap.
 `  jrp dist:rb`
