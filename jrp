@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="11-03-2017_0.1.2"
+version="11-03-2017_0.1.3"
 
 function showHelp(){
     echo 'Example : jrp [method [arg]]'
@@ -15,10 +15,14 @@ function showHelp(){
     echo '   dist,dist [output]        :compiles into a final jar[CLASS]'
     echo '   dist:rb, dist:rb [output] :compiles into a final boostrap jar[RB]'
     echo ' Additionals'
-    echo '  jrp run [-w]'
-    echo '     example: `jrp run -w assets` will run inside the folder assets'
+    echo '  jrp run [-w [folder]] [-l]'
+    echo '     example -w: `jrp run -w assets` will run inside the folder assets'
     echo '     so can access the files inside her without need to run dist'
     echo '     only supports 1 level folder yet'
+    echo ''
+    echo '     example -l: `jrp run -l` or `jrp run -w folder -l` will leave'
+    echo '     the resultant runner file in  last/runner.rb'
+    echo '     this will help you fix errors.'
     return 0
 }
 
@@ -41,7 +45,10 @@ function getClassPath(){
 function check_if_is_jrp(){
     if [ ! -f ./jrp.p ];then echo "Not a JRP project.";exit;fi
 }
-
+function file_not_found(){
+    echo "BUILD FAILED - FILE NOT FOUND - '$main_class'"
+    exit
+}
 if [ $1 ];then
     if [[ ( $1 == '-v' || $1 == '--version' ) ]]; then
         echo $version
@@ -151,14 +158,25 @@ EOF
         current=`pwd`
 
         folder_name='./.run'
+	past=false
         if [ $2 ];then
 	        if [ $2 == "-w" ];then
 		        if  [ $3 ];then
                 folder_name=$3
 		        fi
-	        fi
-	      fi
-
+		else 
+			if [ $2 == "-l" ];then
+				runned=true
+				echo "-> runned file will be in last/runner.rb"
+			fi
+	       fi
+	fi
+	if [ $4 ];then
+		if [ $4 == "-l" ];then
+		    runned=true
+		    echo "-> runned file will be in last/runner.rb"
+		fi
+	fi
   	    getMainClass;main_class=$returned
 
   	    [ ! $folder_name == './.run' ] || mkdir ./.run
@@ -184,31 +202,34 @@ EOF
   	    # Only supports .. yet, not ../../../
   	    # Because would need to compute the number of each '/' in the new path
   	    # passed to '-w' option
-
+	if [ "$runned" = true ];then
+		[ -d ../last ] || mkdir ../last
+		cp $runner_file ../last/runner.rb
+	fi
   	    getClassPath;jruby -J-cp $returned $runner_file
-
-        rm $runner_file
-
-        # project path
+	
+	rm $runner_file
+        
+	# project path
         cd $current
-
         [ ! -d .run ] || rm -r .run
+	
 
         exit
         ;;
     'dist')
         # Distribute as final jar
         check_if_is_jrp
-	getMainClass
-        if [ ! -f ./src/$returned.rb ];then 
-            echo BUILD FAILED - FILE NOT FOUND 
-            exit
-        fi
+        
+        
+        getMainClass;main_class=$returned
+        
+	    [ -f ./src/$main_class.rb ] || file_not_found
+        
         [ -d ./build ] || mkdir build
         [ -d ./build/classes ] || mkdir ./build/classes
 
         [ -d com ] || mkdir com
-        getMainClass;main_class=$returned
 
         # Get Output File name
         if [ $2 ];then
@@ -260,11 +281,11 @@ EOF
             file-roller --add-to=$output.jar ./assets/*
         fi
 
-        cd ./build/classes/com
-
-        file-roller --add-to=../../../$output.jar ./$main_class.class
-
-        cd ../../../
+        cd ./build/classes/
+	echo "Main-Class: $main_class"
+        #file-roller --add-to=../../../$output.jar ./com/$main_class.class
+	jar uvf ../../$output.jar com/$main_class.class
+        cd ../../
         rm -r ./META-INF
         rm -r com
         echo ""
