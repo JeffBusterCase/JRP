@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-version="11-03-2017_0.1.3"
+version="05-2018_0.1.7"
+jrubyjar_link=http://central.maven.org/maven2/org/jruby/jruby-complete/1.7.9/jruby-complete-1.7.9.jar
 
 function showHelp(){
     echo 'Example : jrp [method [arg]]'
@@ -79,7 +80,7 @@ if [ $1 ];then
             mkdir src libs
             touch ./src/$projectName.rb
             echo "Downloading jruby library"
-            wget -nv --show-progress -O ./libs/jruby.jar https://s3.amazonaws.com/jruby.org/downloads/1.7.26/jruby-complete-1.7.26.jar
+            wget -nv --show-progress -O ./libs/jruby.jar $jrubyjar_link
             echo "Main-Class: $projectName" > ./jrp.p
 
             if [ $isLibGDX == "yes" ];then
